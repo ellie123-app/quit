@@ -1346,7 +1346,7 @@ if user_input == access_keyword:
 
         st.write("### 사용자 유형별 세부 데이터")
         
-        if st.checkbox('탈퇴사유별 요약 통계 보기', key='summary_stats'):
+        if st.checkbox('사용자 유형별 요약 통계 보기', key='summary_stats'):
             st.dataframe(all_insights_df2)
             
     
@@ -1865,7 +1865,7 @@ if user_input == access_keyword:
         
         st.write("### 채널별 세부 데이터")
         
-        if st.checkbox('탈퇴사유별 요약 통계 보기', key='summary_stats_channel'):
+        if st.checkbox('채널별 요약 통계 보기', key='summary_stats_channel'):
             st.dataframe(all_insights_df3)
                 
         
@@ -2358,10 +2358,10 @@ if user_input == access_keyword:
             
             st.write("### 가입 기간별 세부 데이터")
             
-            if st.checkbox('탈퇴사유별 요약 통계 보기', key='summary_stats_period'):
+            if st.checkbox('가입 기간별 요약 통계 보기', key='summary_stats_period'):
                 st.dataframe(all_insights_df3)
             
-            if st.checkbox('가입 구간별 데이터프레임 보기', key='detailed_data_period'):
+            if st.checkbox('가입 기간별 데이터프레임 보기', key='detailed_data_period'):
                 # 사용자가 가입 구간을 선택할 수 있는 선택 상자 생성
                 periods_whole = filtered.copy()
                 periods_options = ['전체'] + order
@@ -2376,7 +2376,488 @@ if user_input == access_keyword:
                 st.dataframe(filtered_view)     
     
     
+#-------------------------------------------------------------------------------------------------
+        
+    if page == "접속횟수별":
+            st.title("탈퇴 대시보드")
+            st.text("""탈퇴 통계 어드민 개선 전, 간단하게 탈퇴 통계를 확인하기 위해 제작한 대시보드입니다.
+실시간 연동은 불가하여, 전날까지의 데이터를 업데이트합니다.
+            """)
+            
+            st.text("""
+            """)
+        
+            # 기간 선택 버튼을 가로로 배치
+            col1, col2 = st.columns(2)
+            
+            yesterday = datetime.now() - timedelta(days=1)
+            
+            with col1:
+                start_date = st.date_input("시작 날짜", value=(datetime(2024, 5, 31)).date(), key='start_date')
+            
+            with col2:
+                end_date = st.date_input("종료 날짜", value=yesterday.date(), key='end_date')
+        
+            
+                
+        
+            st.text("""
+            """)
+            st.text("""
+            """)
+            
+            # 선택한 날짜 범위에 따라 데이터 필터링
+            if '탈퇴 일자' in data.columns:
+                start_date = pd.to_datetime(start_date)
+                end_date = pd.to_datetime(end_date) + timedelta(days=1) - timedelta(seconds=1)  # 종료 날짜를 하루의 끝으로 설정
+                filtered = data[(data['탈퇴 일자'] >= start_date) & (data['탈퇴 일자'] <= end_date)]
+                
+                filtered = filtered.dropna(subset=['탈퇴사유'])
+            
+            
+            else:
+                filtered = data
     
+            # 전체 탈퇴자 수 계산
+            total_churners = filtered.shape[0]
+                
+            st.markdown(f"""
+                    <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 140px; border: 2px solid gray; border-radius: 10px;">
+                        <div style="font-size: 15px; color: gray; margin-top: 8px; margin-bottom: 10px;">전체 탈퇴자 수</div>
+                        <div style="font-size: 50px; font-weight: bold;">{total_churners}명</div>
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        
+                
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)  
+
+            # 접속횟수별 탈퇴사유 비율
+            filter_join= filtered[['총 접속 수', '탈퇴사유']].copy()
+            bins = [1, 2, 5, 10, 20, float('inf')]
+            labels = ["1", "2~5", "5~10", "10~20", "20 이상"]
+            filter_join['접속 횟수 구간'] = pd.cut(filter_join['총 접속 수'], bins=bins, labels=labels, right=False)
+            filter_join_access = filter_join.dropna(subset=['접속 횟수 구간'])
+            filter_join_access['탈퇴사유'] = filter_join_access['탈퇴사유'].str.split(';')
+            filter_join_access = filter_join_access.explode('탈퇴사유').dropna().reset_index(drop=True)
+        
+            total_counts = filter_join['접속 횟수 구간'].value_counts().reset_index()
+            total_counts.columns = ['접속 횟수 구간', '개수']
+            total_counts['전체 비율'] = (total_counts['개수'] / total_counts['개수'].sum() * 100).round(1)
+        
+            reason_counts = filter_join_access.groupby(['접속 횟수 구간', '탈퇴사유']).size().reset_index(name='count')
+            total_reason_counts = reason_counts.groupby('접속 횟수 구간')['count'].sum().reset_index()
+            reason_counts = reason_counts.merge(total_reason_counts, on='접속 횟수 구간', suffixes=('', '_total'))
+            reason_counts['비율'] = (reason_counts['count'] / reason_counts['count_total'] * 100).round(1)
+        
+            final_counts = reason_counts.pivot_table(index='접속 횟수 구간', columns='탈퇴사유', values='비율', fill_value=0).reset_index()
+            final_counts = final_counts.merge(total_counts[['접속 횟수 구간', '전체 비율', '개수']], on='접속 횟수 구간')
+            final_counts_dataframe = final_counts.copy()
+        
+            order = ["1", "2~5", "5~10", "10~20", "20 이상"]
+            final_counts['접속 횟수 구간'] = pd.Categorical(final_counts['접속 횟수 구간'], categories=order[::-1], ordered=True)
+            final_counts_dataframe['접속 횟수 구간'] = pd.Categorical(final_counts_dataframe['접속 횟수 구간'], categories=order, ordered=True)
+        
+            final_counts = final_counts.sort_values('접속 횟수 구간').reset_index(drop=True)
+            final_counts_dataframe = final_counts_dataframe.sort_values('접속 횟수 구간').reset_index(drop=True)
+        
+            for column in final_counts.columns:
+                if column not in ['접속 횟수 구간', '개수', '전체 비율']:
+                    final_counts[column] = (final_counts[column] * final_counts['전체 비율'] / 100).round(1)
+        
+            reasons = [
+                '사용할 수 있는 서비스가 없어요.', '개인정보 유출이 걱정돼요.', '타 서비스보다 세금이 더 많이 나와요.',
+                '자료 수집이 안돼요.', '이용 요금이 비싸요.', '직접 해야 하는 게 많아요.', '문의 답변이 오래 걸려요.', '직접 입력할게요.'
+            ]
+        
+            final_counts = final_counts[['접속 횟수 구간', '개수', '전체 비율'] + reasons]
+            final_counts_dataframe = final_counts_dataframe[['접속 횟수 구간', '개수', '전체 비율'] + reasons]
+    
+            
+            st.write("### 접속횟수별 탈퇴 사유 비율")
+        
+            
+            # 그래프 생성
+            fig = px.bar(final_counts.melt(id_vars='접속 횟수 구간', value_vars=final_counts.columns[3:], var_name='탈퇴 사유', value_name='비율'),
+                         y='접속 횟수 구간',
+                         x='비율',
+                         color='탈퇴 사유',
+                         orientation='h',
+                         height=600,
+                         hover_data={'비율': ':.2f%'})
+            
+            fig.update_layout(barmode='stack',
+                              xaxis_title='비율 (%)',
+                              yaxis_title='접속 횟수 구간',
+                              legend_title='탈퇴 사유')
+            
+            st.plotly_chart(fig)
+            
+            for col in final_counts_dataframe.columns:
+                if final_counts_dataframe[col].dtype == 'float64':
+                    final_counts_dataframe[col] = final_counts_dataframe[col].map("{:.1f}".format)
+            
+            # DataFrame 표시
+            check11_key = "data_frame_view_11"
+            check11 = st.checkbox('데이터프레임 보기', key=check11_key)
+            if check11:
+                st.table(final_counts_dataframe)
+        
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+            
+            # -------------------------------------------------------------------------------------------------------------
+            
+                    
+            # 접속 횟수 구간별 사용자 유형 비율
+            filter_user = filtered[['총 접속 수', '사용자 유형']].copy()
+            filter_user['접속 횟수 구간'] = pd.cut(filter_user['총 접속 수'], bins=bins, labels=labels, right=False)
+            filter_user_type = filter_user.dropna(subset=['접속 횟수 구간'])
+        
+            total_counts_user = filter_user_type['접속 횟수 구간'].value_counts().reset_index()
+            total_counts_user.columns = ['접속 횟수 구간', '개수']
+            total_counts_user['전체 비율'] = (total_counts_user['개수'] / total_counts_user['개수'].sum() * 100).round(1)
+        
+            user_type_counts = filter_user_type.groupby(['접속 횟수 구간', '사용자 유형']).size().reset_index(name='count')
+            total_user_type_counts = user_type_counts.groupby('접속 횟수 구간')['count'].sum().reset_index()
+            user_type_counts = user_type_counts.merge(total_user_type_counts, on='접속 횟수 구간', suffixes=('', '_total'))
+            user_type_counts['비율'] = (user_type_counts['count'] / user_type_counts['count_total'] * 100).round(1)
+        
+            final_user_type_counts = user_type_counts.pivot_table(index='접속 횟수 구간', columns='사용자 유형', values='비율', fill_value=0).reset_index()
+            final_user_type_counts = final_user_type_counts.merge(total_counts_user[['접속 횟수 구간', '전체 비율', '개수']], on='접속 횟수 구간')
+            final_user_type_counts_dataframe = final_user_type_counts.copy()
+        
+            for user_type in final_user_type_counts.columns[1:-2]:
+                final_user_type_counts[user_type] = (final_user_type_counts[user_type] * final_user_type_counts['전체 비율'] / 100).round(1)
+        
+            final_user_type_counts['접속 횟수 구간'] = pd.Categorical(final_user_type_counts['접속 횟수 구간'], categories=order[::-1], ordered=True)
+            final_user_type_counts_dataframe['접속 횟수 구간'] = pd.Categorical(final_user_type_counts_dataframe['접속 횟수 구간'], categories=order, ordered=True)
+        
+            final_user_type_counts = final_user_type_counts.sort_values('접속 횟수 구간').reset_index(drop=True)
+            final_user_type_counts_dataframe = final_user_type_counts_dataframe.sort_values('접속 횟수 구간').reset_index(drop=True)
+        
+            user_types = ['그 외', '개인사업자', '법인', '폐업']
+            final_user_type_counts = final_user_type_counts[['접속 횟수 구간', '개수', '전체 비율'] + user_types]
+            final_user_type_counts_dataframe = final_user_type_counts_dataframe[['접속 횟수 구간', '개수', '전체 비율'] + user_types]
+    
+        
+            
+                    
+           # 데이터프레임 표시
+            st.write("### 접속횟수별 사용자 유형 비율")
+            
+            # 그래프 생성
+            fig_user_type = px.bar(final_user_type_counts.melt(id_vars='접속 횟수 구간', value_vars=user_types, var_name='사용자 유형', value_name='비율'),
+                                   y='접속 횟수 구간',
+                                   x='비율',
+                                   color='사용자 유형',
+                                   orientation='h',
+                                   height=600,
+                                   hover_data={'비율': ':.2f%'})
+            
+            fig_user_type.update_layout(barmode='stack',
+                                        xaxis_title='비율 (%)',
+                                        yaxis_title='접속 횟수 구간',
+                                        legend_title='사용자 유형')
+            
+            st.plotly_chart(fig_user_type)
+            
+            for col in final_user_type_counts_dataframe.columns:
+                if final_user_type_counts_dataframe[col].dtype == 'float64':
+                    final_user_type_counts_dataframe[col] = final_user_type_counts_dataframe[col].map("{:.1f}".format)
+            
+            # DataFrame 표시
+            check12_key = "data_frame_view_12"
+            check12 = st.checkbox('데이터프레임 보기', key=check12_key)
+            if check12:
+                st.table(final_user_type_counts_dataframe)
+        
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+            
+            
+            # -------------------------------------------------------------------------------------------------------------
+            
+            
+            # 접속 횟수별 가입 구간 비율
+            filter_access = filtered[['총 접속 수', '가입 구간']].copy()
+            bins = [1, 2, 5, 10, 20, float('inf')]
+            labels = ["1", "2~5", "5~10", "10~20", "20 이상"]
+            filter_access['접속 횟수 구간'] = pd.cut(filter_access['총 접속 수'], bins=bins, labels=labels, right=False)
+            filter_access_period = filter_access.dropna(subset=['접속 횟수 구간'])
+            filter_access_period = filter_access_period.reset_index(drop=True)
+            
+            total_access_period_counts = filter_access['접속 횟수 구간'].value_counts().reset_index()
+            total_access_period_counts.columns = ['접속 횟수 구간', '개수']
+            
+            access_period_counts = filter_access_period.groupby(['접속 횟수 구간', '가입 구간']).size().unstack(fill_value=0)
+            access_period_counts = access_period_counts.div(access_period_counts.sum(axis=1), axis=0) * 100
+            access_period_counts = access_period_counts.reset_index()
+            
+            total_access_period_counts = filter_access_period['접속 횟수 구간'].value_counts().reset_index()
+            total_access_period_counts.columns = ['접속 횟수 구간', '개수']
+            total_access_period_counts['전체 비율'] = (total_access_period_counts['개수'] / total_access_period_counts['개수'].sum() * 100).round(1)
+            
+            access_period_counts = access_period_counts.merge(total_access_period_counts[['접속 횟수 구간', '개수', '전체 비율']], on='접속 횟수 구간')
+            access_period_counts_dataframe = access_period_counts.copy()
+            
+            order = ['0일', '30일 이내', '90일 이내', '180일 이내', '365일 이내', '365일 이상']
+            
+            for label in order:
+                if label in access_period_counts.columns:
+                    access_period_counts[label] = (access_period_counts[label] * access_period_counts['전체 비율'] / 100).round(1)
+            
+            # 원래 순서대로 접속 횟수 구간 정렬
+            access_period_counts['접속 횟수 구간'] = pd.Categorical(access_period_counts['접속 횟수 구간'], categories=labels, ordered=True)
+            access_period_counts_dataframe['접속 횟수 구간'] = pd.Categorical(access_period_counts_dataframe['접속 횟수 구간'], categories=labels, ordered=True)
+            
+            access_period_counts = access_period_counts.sort_values('접속 횟수 구간').reset_index(drop=True)
+            access_period_counts_dataframe = access_period_counts_dataframe.sort_values('접속 횟수 구간').reset_index(drop=True)
+            
+            # 데이터프레임 순서 지정
+            access_period_counts = access_period_counts[['접속 횟수 구간', '개수', '전체 비율'] + order]
+            access_period_counts_dataframe = access_period_counts_dataframe[['접속 횟수 구간', '개수', '전체 비율'] + order]
+            
+            st.write("### 접속횟수별 가입구간 비율")
+            fig_access_period = go.Figure()
+            
+            for period in order:
+                if period in access_period_counts.columns:
+                    fig_access_period.add_trace(go.Scatter(
+                        x=access_period_counts['접속 횟수 구간'],
+                        y=access_period_counts[period],
+                        mode='lines+markers',
+                        name=period
+                    ))
+            
+            fig_access_period.update_layout(
+                xaxis_title='접속 횟수 구간',
+                yaxis_title='비율 (%)',
+                legend_title='가입 구간',
+                height=600
+            )
+            
+            st.plotly_chart(fig_access_period)
+            
+            for col in access_period_counts_dataframe.columns:
+                if access_period_counts_dataframe[col].dtype == 'float64':
+                    access_period_counts_dataframe[col] = access_period_counts_dataframe[col].map("{:.1f}".format)
+    
+            
+            check13_key = "data_frame_view_13"
+            check13 = st.checkbox('데이터프레임 보기', key=check13_key)
+            if check13:
+                st.table(access_period_counts_dataframe)
+    
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+            
+    
+    # -------------------------------------------------------------------------------------------------------------
+    
+            # 접속횟수별 채널 비율
+            channel_counts = filtered[['총 접속 수', '채널']].copy()
+            channel_counts['접속 횟수 구간'] = pd.cut(channel_counts['총 접속 수'], bins=bins, labels=labels, right=False)
+            filter_join_channel = channel_counts.dropna(subset=['접속 횟수 구간'])
+            
+            # 전체 카운트 및 비율 계산
+            total_join_channel_counts = filter_join_channel['접속 횟수 구간'].value_counts().reset_index()
+            total_join_channel_counts.columns = ['접속 횟수 구간', '개수']
+            total_join_channel_counts['전체 비율'] = (total_join_channel_counts['개수'] / total_join_channel_counts['개수'].sum() * 100).round(1)
+            
+            # 채널별 비율 계산
+            join_channel_counts = filter_join_channel.groupby(['접속 횟수 구간', '채널']).size().unstack(fill_value=0)
+            join_channel_counts = join_channel_counts.div(join_channel_counts.sum(axis=1), axis=0) * 100
+            join_channel_counts = join_channel_counts.reset_index()
+            
+            # 전체 비율 적용
+            join_channel_counts = join_channel_counts.merge(total_join_channel_counts[['접속 횟수 구간', '개수', '전체 비율']], on='접속 횟수 구간')
+            join_channel_counts_dataframe = join_channel_counts.copy()
+            
+            for label in channel_counts['채널'].unique():
+                if label in join_channel_counts.columns:
+                    join_channel_counts[label] = (join_channel_counts[label] * join_channel_counts['전체 비율'] / 100).round(1)
+            
+            final_join_channel_counts = join_channel_counts[['접속 횟수 구간', '개수', '전체 비율'] + [label for label in channel_counts['채널'].unique() if label in join_channel_counts.columns]]
+            join_channel_counts_dataframe = join_channel_counts_dataframe[['접속 횟수 구간', '개수', '전체 비율'] + [label for label in channel_counts['채널'].unique() if label in join_channel_counts.columns]]
+            
+            final_join_channel_counts.columns = ['접속 횟수 구간', '개수', '전체 비율'] + [label for label in channel_counts['채널'].unique() if label in join_channel_counts.columns]
+            join_channel_counts_dataframe.columns = ['접속 횟수 구간', '개수', '전체 비율'] + [label for label in channel_counts['채널'].unique() if label in join_channel_counts.columns]
+            
+            # 원래 순서대로 접속 횟수 구간 정렬
+            final_join_channel_counts['접속 횟수 구간'] = pd.Categorical(final_join_channel_counts['접속 횟수 구간'], categories=labels[::-1], ordered=True)
+            final_join_channel_counts = final_join_channel_counts.sort_values('접속 횟수 구간').reset_index(drop=True)
+            join_channel_counts_dataframe['접속 횟수 구간'] = pd.Categorical(join_channel_counts_dataframe['접속 횟수 구간'], categories=labels, ordered=True)
+            join_channel_counts_dataframe = join_channel_counts_dataframe.sort_values('접속 횟수 구간').reset_index(drop=True)
+            
+            st.write("### 접속횟수별 채널 비율")
+            
+            # 그래프 생성
+            fig_channel = px.bar(final_join_channel_counts.melt(id_vars='접속 횟수 구간', value_vars=[label for label in channel_counts['채널'].unique() if label in join_channel_counts.columns], var_name='채널', value_name='비율'),
+                                 y='접속 횟수 구간',
+                                 x='비율',
+                                 color='채널',
+                                 orientation='h',
+                                 height=600,
+                                 hover_data={'비율': ':.2f%'})
+            
+            fig_channel.update_layout(barmode='stack',
+                                      xaxis_title='비율 (%)',
+                                      yaxis_title='접속 횟수 구간',
+                                      legend_title='채널')
+            
+            st.plotly_chart(fig_channel)
+            
+            for col in join_channel_counts_dataframe.columns:
+                if join_channel_counts_dataframe[col].dtype == 'float64':
+                    join_channel_counts_dataframe[col] = join_channel_counts_dataframe[col].map("{:.1f}".format)
+            
+            check14_key = "data_frame_view_14"
+            check14 = st.checkbox('데이터프레임 보기', key=check14_key)
+            if check14:
+                st.table(join_channel_counts_dataframe)
+    
+        
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+            st.text("""
+            """)
+    
+    # -------------------------------------------------------------------------------------------------------------
+            
+            # 접속 횟수 구간 추가
+            filtered['접속 횟수 구간'] = pd.cut(filtered['총 접속 수'], bins=[1, 2, 5, 10, 20, float('inf')], labels=["1", "2~5", "5~10", "10~20", "20 이상"], right=False)
+            
+            # 요약 통계 함수 정의
+            def calculate_access_insights(dataframe, access):
+                """Calculate insights for a specific access range from a dataframe."""
+                access_data = dataframe[dataframe['접속 횟수 구간'] == access]
+                total_count = dataframe.shape[0]
+                access_count = access_data.shape[0]
+                
+                type_ratio = (access_count / total_count) * 100
+                total_access_mean = access_data['총 접속 수'].mean()
+                # total_access_0_1_ratio = (access_data['총 접속 수'] <= 1).mean() * 100
+            
+                service_columns = [
+                    '부가세 결제 수', '부가세 결제 취소 수', '부가세 계산 시작 수', '부가세 계산 완료 수',
+                    '종소세 결제 수', '종소세 결제 취소 수', '종소세 계산 시작 수', '종소세 계산 완료 수',
+                    '인건비 결제 수', '인건비 결제 취소 수', '매출알림 서비스 이용 여부', '매출알림 서비스 탈퇴 여부',
+                    '안심신고 이용 여부', '재가입 여부'
+                ]
+            
+                service_usage_stats = {}
+                for column in service_columns:
+                    if access_data[column].dtype == 'object':
+                        service_usage_stats[f"{column} 비율"] = (access_data[column] == 'Y').mean() * 100
+                    else:
+                        service_usage_stats[f"{column} 평균"] = access_data[column].mean()
+                        
+                # 탈퇴 사유 비율 계산
+                reasons = [
+                    '사용할 수 있는 서비스가 없어요.', '개인정보 유출이 걱정돼요.', '타 서비스보다 세금이 더 많이 나와요.',
+                    '자료 수집이 안돼요.', '이용 요금이 비싸요.', '직접 해야 하는 게 많아요.', '문의 답변이 오래 걸려요.', '직접 입력할게요.'
+                ]
+                reason_counts = access_data['탈퇴사유'].dropna().apply(lambda x: [r for r in reasons if r in x])
+                reason_flattened = [item for sublist in reason_counts for item in sublist]
+                reason_ratio = pd.Series(reason_flattened).value_counts(normalize=True) * 100
+                reason_ratio = reason_ratio.to_dict()
+                 
+                business_type_ratio = access_data['사용자 유형'].value_counts(normalize=True) * 100
+                channel_ratio = access_data['채널'].value_counts(normalize=True) * 100
+                
+                insights = {
+                    '개수': access_count,
+                    '비율': type_ratio,
+                    '접속 횟수 평균': total_access_mean,
+                    # '1회이하 접속 비율': total_access_0_1_ratio,
+                    '가입 기간 평균': access_data['가입 기간'].mean(),
+                    '24시간 내 탈퇴 비율': (access_data['가입 기간'] == 0).mean() * 100,
+                    **{f'{k} 비율': v for k, v in reason_ratio.items()},
+                    **{f'{a} 비율': b for a, b in business_type_ratio.items()},
+                    **{f'{k} 비율': v for k, v in channel_ratio.items()},
+                    **service_usage_stats
+                }
+            
+                return pd.DataFrame([insights], index=[access]).round(2)
+            
+            def generate_all_insights(dataframe):
+                unique_accesses = dataframe['접속 횟수 구간'].unique()
+                all_insights = [calculate_access_insights(dataframe, access) for access in unique_accesses]
+            
+                final_df = pd.concat(all_insights)
+            
+                # 열 순서 지정
+                reasons = [
+                    '사용할 수 있는 서비스가 없어요. 비율', '개인정보 유출이 걱정돼요. 비율', '타 서비스보다 세금이 더 많이 나와요. 비율',
+                    '자료 수집이 안돼요. 비율', '이용 요금이 비싸요. 비율', '직접 해야 하는 게 많아요. 비율', '문의 답변이 오래 걸려요. 비율', '직접 입력할게요. 비율'
+                ]
+                desired_order = [
+                    '개수', '비율','접속 횟수 평균'] + reasons + ['그 외 비율', '개인사업자 비율', 
+                    '폐업 비율', '법인 비율', 
+                    '가입 기간 평균', '24시간 내 탈퇴 비율', 'SSEM 비율' , 'KKB 비율'
+                ]
+                desired_order = desired_order + [col for col in final_df.columns if col not in desired_order]
+                final_df = final_df[desired_order]
+                
+                # 접속 횟수 구간 순서 지정
+                labels = ["1", "2~5", "5~10", "10~20", "20 이상"]
+                final_df = final_df.reindex(labels)
+            
+                return final_df
+            
+            # 사용 예시
+            quit_access_summary = filtered.copy()
+            all_insights_df3 = generate_all_insights(quit_access_summary)
+            all_insights_df3.fillna(0, inplace=True)
+            
+            st.write("### 접속 횟수별 세부 데이터")
+            
+            if st.checkbox('접속 횟수별 요약 통계 보기', key='summary_stats_access'):
+                st.dataframe(all_insights_df3)
+            
+            if st.checkbox('접속 횟수별 데이터프레임 보기', key='detailed_data_access'):
+                # 사용자가 접속 횟수 구간을 선택할 수 있는 선택 상자 생성
+                accesses_whole = filtered.copy()
+                accesses_options = ['전체'] + labels
+                selected_access = st.selectbox('접속 횟수 구간 선택:', options=accesses_options, index=0, key='selectbox_access')
+            
+                # 선택된 접속 횟수 구간에 따라 데이터 필터링
+                if selected_access == '전체':
+                    filtered_view = accesses_whole
+                else:
+                    filtered_view = accesses_whole[accesses_whole['접속 횟수 구간'] == selected_access]
+            
+                st.dataframe(filtered_view)
     
     
     #-------------------------------------------------------------------------------------------------
