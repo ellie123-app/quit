@@ -1,3 +1,3 @@
-{% extends "base-requirements.jinja" %}
+
 matplotlib==3.4.3
 streamlit==1.8.0
