@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+import matplotlib
+matplotlib.use('Agg')
 import gdown
 import plotly.express as px
 import plotly.graph_objects as go
