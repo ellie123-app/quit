@@ -36,8 +36,8 @@ if user_input == access_keyword:
     file_id0 = '1-9yLe2XkKc1ebj_uS-AOXkgluNPC7QaR'
     url0 = f'https://drive.google.com/uc?id={file_id0}'
     
-    data = pd.read_csv(url)
-    sub_data = pd.read_csv(url0)
+    data = pd.read_csv(url,encoding='utf-8')
+    sub_data = pd.read_csv(url0,encoding='utf-8')
     
     if '탈퇴 일자' in data.columns:
         data['탈퇴 일자'] = pd.to_datetime(data['탈퇴 일자'], errors='coerce')
