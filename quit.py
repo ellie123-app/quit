@@ -330,7 +330,7 @@ if user_input == access_keyword:
             """, unsafe_allow_html=True)
 
             if st.checkbox('탈퇴 상세 데이터프레임 보기', key='summary_stats'):
-            st.dataframe(filtered)
+                st.dataframe(filtered)
             
     
     
