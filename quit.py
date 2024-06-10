@@ -337,7 +337,8 @@ if user_input == access_keyword:
         """)
         st.text("""
         """)
-
+        
+        st.write("### 탈퇴 세부 데이터")
         if st.checkbox('탈퇴 상세 데이터프레임 전체보기', key='summary_stats'):
             st.dataframe(filtered)
             
