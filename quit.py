@@ -328,6 +328,9 @@ if user_input == access_keyword:
                     <div style="font-size: 50px; font-weight: bold;">{tax_entry_complete_rate:.2%}</div>
                 </div>
             """, unsafe_allow_html=True)
+
+            if st.checkbox('탈퇴 상세 데이터프레임 보기', key='summary_stats'):
+            st.dataframe(filtered)
             
     
     
